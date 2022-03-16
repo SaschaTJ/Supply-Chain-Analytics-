@@ -20,12 +20,19 @@ Size = ["Small", "Large"]
 S = length(Size) # number of warehouse sizes
 
 # new demand after 80% growth
-Demand = zeros(I,P)
-Demand[1]= [320000 200000 160000 220000 350000 175000]; #calculated based on 80% growth for the next three years
-growth = 1.8
-for p = 2:P
-    Demand[p] = Demand[p-1]*growth
-end
+#Demand = zeros(I,P)
+#Demand[1,:]= [320000 200000 160000 220000 350000 175000]; #calculated based on 80% growth for the next three years
+#growth = 1.8
+#for p = 2:P
+#    Demand[p] = Demand[p-1]*growth
+#end
+    Demand= [
+        320000 200000 160000 220000 350000 175000
+        576000 360000 288000 396000 630000 315000
+        1036800 648000 518400 712800 1134000 567000
+        1866240 1166400 933120 1283040 2041200 1020600
+        1866240 1166400 933120 1283040 2041200 1020600
+        ]; #calculated based on 80% growth for the next three years
 # Fixed cost based on size of warehouse 
 Fixed = [
     300000 250000 220000 220000 240000 
@@ -55,7 +62,7 @@ model = Model(Gurobi.Optimizer);
 @variable(model, x[j = 1:J, s = 1:S, p = 1:P] >= 0, Bin); 
 # x[j,s,p]
 # Fraction of demand from zone i to allocate to facility in location j in year p
-@variable(model,y[i = 1:I, j = 1:J, p = 1:P] >=0); 
+@variable(model,y[i = 1:I, j = 1:J, s = 1:S,p = 1:P] >=0); 
 # y[i,j,p]
 # Tracking the year when the facility was first opened
 @variable(model, z[j = 1:J, p = 1:P] >=0, Bin); 
@@ -65,7 +72,7 @@ model = Model(Gurobi.Optimizer);
 #
 @objective(model, Min, 
 sum(x[j,s,p] * (Fixed[j,s]+InvFixed) for j in 1:J,p in 1:P,s in 1:S) +
-sum(y[i,j,p] * Demand[i,p] * (sum(Var[j,s]*x[j,s,p] for s in 1:S) + InvVar + ShippingCost[i,j] for i in 1:I, j in 1:J, p in 1:P) for i in 1:I, j in 1:J, p in 1:P));
+sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 1:I, j in 1:J, s in 1:S,p in 1:P));
 
 #-------
 # edited
@@ -79,23 +86,23 @@ sum(y[i,j,p] * Demand[i,p] * (sum(Var[j,s]*x[j,s,p] for s in 1:S) + InvVar + Shi
 # new
 # equation (4)
 # If a facility is leased, the lease must be of minimum 3 years length
-@constraint(model, [j = 1:J], 3*sum(z[j,p] for p in 1:P) <= sum(x[j,s,p] for s in 1:S, p in 1:P));
+@constraint(model, [j = 1:J], sum(z[j,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for s in 1:S, p in 1:P));
 # edited
 # equation (5) - need to correct constrint equation in Overleaf
 # can only assign demand to open facilities
-@constraint(model, [i = 1:I, j = 1:J, p = 1:P], y[i,j,p] <= sum(x[j,s,p] for s in 1:S));  
+@constraint(model, [i = 1:I, j = 1:J, s=1:S,p = 1:P], y[i,j,s,p] <= x[j,s,p]);  
 # edited 
 # equation (6) - need to correct constrint equation in Overleaf
 # no unassigned demand for any year
-@constraint(model, [p = 1:P], sum(sum(y[i,j,p] for j in 1:J) for i in 1:I) == 1 );
+@constraint(model, [p = 1:P], sum(y[i,j,s,p] for j in 1:J,s in 1:S) == 1);
 # edited
 # equation (7)
 # Capacity constraint (Cannot allocate more demand to a facility j than there is capacity for)
-@constraint(model, [j = 1:J, p = 1:P], sum(y[i,j,p]*Demand[p,i] for i in 1:I) <= sum(x[j,s,p]*Capacity[s] for s in 1:S));
+@constraint(model, [j = 1:J, p = 1:P], sum(y[i,j,s,p]*Demand[p,i] for i in 1:I,s in 1:S) <= sum(x[j,s,p]*Capacity[s] for s in 1:S));
 # edited
 # equation (8)
 # non-negativity constraint, cannot allocate negative demand
-@constraint(model, [i = 1:I, j = 1:J, p = 1:P], y[i,j,p] >= 0);
+@constraint(model, [i = 1:I, j = 1:J, s = 1:S, p = 1:P], y[i,j,s,p] >= 0);
 # @constraint(model,yr > 1 ? [j=1:m,yr = 1:P],  (z[j,yr] <= sum(x[j,c,yr] for c in 1:s)-sum(x[j,c,yr-1] for c in 1:s)) : );
 #  @constraint(model, [i=1:m,j=1:n,yr=1:P], yr <= 4 ? sum(x[j,c,yrj+1] = sum x[j] for j in 3:n | 0)
 #  @constraint(model,[j=1:n,z=1:3],(sum(x[j,c,yr] for yr in z:z+2)== 0 || sum(x[j,c,yr] for yr in z:z+2)== 3))
