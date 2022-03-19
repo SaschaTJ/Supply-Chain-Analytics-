@@ -106,7 +106,7 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (3)
     # Must update the tracking variable z if a facility f was not open in the previous year
-@constraint(model, [j=1:J,p=2:P], z[j,p] >= sum(x[j,s,p] for s in 1:S) - sum(x[j,s,p-1] for s in 1:S));
+@constraint(model, [j=1:J,p=1:P], z[j,p] >= sum(x[j,s,p] for s in 1:S) - (p>1 ? sum(x[j,s,p-1] for s in 1:S) : 0));
 
     # equation (4)
     # If a facility is leased, the lease must be of minimum 3 years length
