@@ -1,6 +1,6 @@
 using JuMP
 # using Cbc
-using Gurobi
+using Cbc
 
 Zone = ["Northwest", "Southwest", "Upper Midwest", "Lower Midwest", "Northeast", "Southeast"]
 I = length(Zone) # number of customers : 6
@@ -30,11 +30,11 @@ Demand= [
 
 
 Total_demand = [
-    0 0 0 0 0
-    0 0 0 0 0
-    0 0 0 0 0
-    0 0 0 0 0
-    0 0 0 0 0
+    0.0 0.0 0.0 0.0 0.0
+    0.0 0.0 0.0 0.0 0.0
+    0.0 0.0 0.0 0.0 0.0
+    0.0 0.0 0.0 0.0 0.0
+    0.0 0.0 0.0 0.0 0.0
     ];
 
 growth = 1.8
@@ -77,21 +77,20 @@ ShippingCost = [
 
 MinLease = 3 ;
 
-model = Model(Gurobi.Optimizer);
+model = Model(Cbc.Optimizer);
 
     # binary: decision to open a facility of size s in location j in year p
-@variable(model, x[j = 1:J, s = 1:S, p = 1:P] >= 0, Bin);
+@variable(model, x[j=1:J,s=1:S,p=1:P] >= 0, Bin);
     # x[j,s,p]
 
     # Fraction of demand from zone i to allocate to facility in location j in year p
-@variable(model,y[i = 1:I, j = 1:J, s = 1:S, p = 1:P] >=0);
+@variable(model,y[i=1:I,j=1:J,s=1:S,p=1:P] >=0);
 
     # y[i,j,s,p]
 
     # Tracking the year when the facility was first opened
-@variable(model, z[j = 1:J, p = 1:P] >=0, Bin);
+@variable(model, z[j=1:J,p=1:P] >=0, Bin);
     # z[j,p]
-
     #-------
 
     #
@@ -107,23 +106,23 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (3)
     # Must update the tracking variable z if a facility f was not open in the previous year
-@constraint(model, [j = 1:J, p = 2:P], z[j,p] <= sum(x[j,s,p] for s in 1:S) - sum(x[j,s,p-1] for s in 1:S));
+@constraint(model, [j=1:J,p=2:P], z[j,p] >= sum(x[j,s,p] for s in 1:S) - sum(x[j,s,p-1] for s in 1:S));
 
     # equation (4)
     # If a facility is leased, the lease must be of minimum 3 years length
-@constraint(model, [j = 1:J], sum(z[j,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for s in 1:S, p in 1:P));
+@constraint(model, [j=1:J], sum(z[j,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for s in 1:S, p in 1:P));
 
     # equation (5)
     # can only assign demand to open facilities
-@constraint(model, [i = 1:I, j = 1:J, s = 1:S, p = 1:P], y[i,j,s,p] <= x[j,s,p]);
+@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P], y[i,j,s,p] <= x[j,s,p]);
 
     # equation (6)
     # no unassigned demand for any year
-@constraint(model, [i in 1:I, p = 1:P], sum(y[i,j,s,p] for j in 1:J, s in 1:S) == 1);
+@constraint(model, [i=1:I,p=1:P], sum(y[i,j,s,p] for j in 1:J, s in 1:S) == 1);
 
     # equation (7)
     # Capacity constraint (Cannot allocate more demand to a facility j than there is capacity for)
-@constraint(model, [j = 1:J, p = 1:P], sum(y[i,j,s,p]*Demand[i,p] for i in 1:I, s in 1:S) <= sum(x[j,s,p]*Capacity[s] for s in 1:S));
+@constraint(model, [j=1:J,p=1:P], sum(y[i,j,s,p]*Demand[i,p] for i in 1:I, s in 1:S) <= sum(x[j,s,p]*Capacity[s] for s in 1:S));
 
     #-------
     # SOLVE
@@ -163,3 +162,4 @@ if termination_status(model) == MOI.OPTIMAL
 else
     println("No optimal solution available")
 end
+
