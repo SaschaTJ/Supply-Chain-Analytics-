@@ -162,9 +162,3 @@ if termination_status(model) == MOI.OPTIMAL
 else
     println("No optimal solution available")
 end
-
-for p=1:P
-    for s=1:S
-        println(value(z[1,s,p]), " for Facility: ",Facility[1]," Size: ",Size[s])
-    end
-end
