@@ -89,7 +89,7 @@ model = Model(Cbc.Optimizer);
     # y[i,j,s,p]
 
     # Tracking the year when the facility was first opened
-@variable(model, z[j=1:J,p=1:P] >=0, Bin);
+@variable(model, z[j=1:J,s=1:S,p=1:P] >=0, Bin);
     # z[j,p]
     #-------
 
@@ -106,11 +106,11 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (3)
     # Must update the tracking variable z if a facility f was not open in the previous year
-@constraint(model, [j=1:J,p=1:P], z[j,p] >= sum(x[j,s,p] for s in 1:S) - (p>1 ? sum(x[j,s,p-1] for s in 1:S) : 0));
+@constraint(model, [j=1:J,s=1:S,p=1:P], z[j,s,p] >= x[j,s,p] - (p>1 ? x[j,s,p-1] : 0));
 
     # equation (4)
     # If a facility is leased, the lease must be of minimum 3 years length
-@constraint(model, [j=1:J], sum(z[j,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for s in 1:S, p in 1:P));
+@constraint(model, [j=1:J,s=1:S], sum(z[j,s,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for p in 1:P));
 
     # equation (5)
     # can only assign demand to open facilities
