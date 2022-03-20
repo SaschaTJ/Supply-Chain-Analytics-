@@ -110,7 +110,7 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (4)
     # If a facility is leased, the lease must be of minimum 3 years length
-@constraint(model, [j=1:J,s=1:S], sum(z[j,s,p]*min(MinLease,P-p) for p in 1:P) <= sum(x[j,s,p] for p in 1:P));
+@constraint(model, [j=1:J,s=1:S], sum(z[j,s,p]*min(MinLease,P-p+1) for p in 1:P) <= sum(x[j,s,p] for p in 1:P));
 
     # equation (5)
     # can only assign demand to open facilities
@@ -163,3 +163,8 @@ else
     println("No optimal solution available")
 end
 
+for p=1:P
+    for s=1:S
+        println(value(z[1,s,p]), " for Facility: ",Facility[1]," Size: ",Size[s])
+    end
+end
