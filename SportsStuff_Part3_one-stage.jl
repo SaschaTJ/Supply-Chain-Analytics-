@@ -192,7 +192,9 @@ sum(y[i,j,s,p,sd] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar +
 @constraint(model, [j=1:J,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd]*(Demand[i,p]*scenario_demand[i,p,sd]) for i in 1:I, s in 1:S) <= sum(x[j,s,p,sc]*(Capacity[s]*scenario_capacity[p,s,sc]) for s in 1:S));
 
 #non-anticipatory constraint
-@constraint(model, [sc=1:SC-1,j=1:J,s=1:S], x[j,s,1,sc] == x[j,s,1,sc+1])
+for p=1:P
+    @constraint(model, [sc=1:SC-1,j=1:J,s=1:S], x[j,s,p,sc] == x[j,s,p,sc+1])
+end
 #@constraint(model, [sd=1:SD-1,i=1:I,j=1:J,s=1:S], y[i,j,s,1,sd] == y[i,j,s,1,sd+1])
     #-------
     # SOLVE
@@ -209,33 +211,28 @@ if termination_status(model) == MOI.OPTIMAL
     println("   ")
     println("----------------------")
     println("   ")
-    for sd=1:SD
-        println("Demand scenario = ",sd)
-        for sc=1:SC
-            println("Capacity scenario = ",sc)
-            for p = 1:P
-                println("Production year = $(Year[p]) ")
-                println("   ")
-                for j = 1:J
-                    for s = 1:S
-                        if value(x[j,s,p,sc]) == 1
-                            println("Facility = $(Facility[j]) | Size = $(Size[s])")
-                            println(" Serving demand zone: ")
-                            for i = 1:I
-                                if value(y[i,j,s,p,sd]) != 0
-                                    println("  $(Zone[i]) = $( value(y[i,j,s,p,sd])*Demand[i,p]*scenario_demand[i,p,sd]) " )
-                                    Total_demand[j,p,sd] += value(y[i,j,s,p])*Demand[i,p]*scenario_demand[i,p,sd]
-                                end
-                            end
-                            println(" Total demand served = $(Total_demand[j,p,sd])" )
-                            println("   ")
+    println("Capacity scenario = ",sc)
+    for p = 1:P
+        println("Production year = $(Year[p]) ")
+        println("   ")
+        for j = 1:J
+            for s = 1:S
+                if value(x[j,s,p,1]) == 1
+                    println("Facility = $(Facility[j]) | Size = $(Size[s])")
+                    println(" Serving demand zone: ")
+                    for i = 1:I
+                        if value(y[i,j,s,p,1]) != 0
+                            println("  $(Zone[i]) = $( value(y[i,j,s,p,1])*Demand[i,p]*scenario_demand[i,p,1]) " )
+                            Total_demand[j,p,1] += value(y[i,j,s,p,1])*Demand[i,p]*scenario_demand[i,p,1]
                         end
                     end
+                    println(" Total demand served = $(Total_demand[j,p,1])" )
+                    println("   ")
                 end
-                println("----------------------")
-                println("   ")
             end
         end
+        println("----------------------")
+        println("   ")
     end
 else
     println("No optimal solution available")
