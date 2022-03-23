@@ -147,7 +147,7 @@ MinLease = 3 ;
 model = Model(Cbc.Optimizer);
 
     # binary: decision to open a facility of size s in location j in year p
-@variable(model, x[j=1:J,s=1:S,p=1:P,sc=1:SC] >= 0, Bin);
+@variable(model, x[j=1:J,s=1:S,p=1:P] >= 0, Bin);
     # x[j,s,p]
 
     # Fraction of demand from zone i to allocate to facility in location j in year p
@@ -156,32 +156,32 @@ model = Model(Cbc.Optimizer);
     # y[i,j,s,p]
 
     # Tracking the year when the facility was first opened
-@variable(model, z[j=1:J,s=1:S,p=1:P,sc=1:SC] >=0, Bin);
+@variable(model, z[j=1:J,s=1:S,p=1:P] >=0, Bin);
     # z[j,p]
     #-------
 
     #
 @objective(model, Min,
-sum(x[j,s,p,sc] * (Fixed[j,s] + InvFixed) * sc_prob[sc] for j in 1:J,s in 1:S,p in 1:P,sc in 1:SC) +
+sum(x[j,s,p] * (Fixed[j,s] + InvFixed) for j in 1:J,s in 1:S,p in 1:P) +
 sum(y[i,j,s,p,sd] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar + ShippingCost[i,j]) * sd_prob[sd] for i in 1:I,j in 1:J,s in 1:S,p in 1:P,sd in 1:SD));
 
     #-------
 
     # equation (2)
     # Cannot open a small and large facility in the same location for each capacity-scenario
-@constraint(model, [j=1:J,p=1:P,sc=1:SC], sum(x[j,s,p,sc] for s in 1:S) <= 1);
+@constraint(model, [j=1:J,p=1:P], sum(x[j,s,p] for s in 1:S) <= 1);
 
     # equation (3)
     # Must update the tracking variable z if a facility f was not open in the previous year
-@constraint(model, [j=1:J,s=1:S,p=1:P,sc=1:SC], z[j,s,p,sc] >= x[j,s,p,sc] - (p>1 ? x[j,s,p-1,sc] : 0));
+@constraint(model, [j=1:J,s=1:S,p=1:P], z[j,s,p] >= x[j,s,p] - (p>1 ? x[j,s,p-1] : 0));
 
     # equation (4)
     # If a facility is leased, the lease must be of minimum 3 years length
-@constraint(model, [j=1:J,s=1:S,sc=1:SC], sum(z[j,s,p,sc]*min(MinLease,P-p+1) for p in 1:P) <= sum(x[j,s,p,sc] for p in 1:P));
+@constraint(model, [j=1:J,s=1:S], sum(z[j,s,p]*min(MinLease,P-p+1) for p in 1:P) <= sum(x[j,s,p] for p in 1:P));
 
     # equation (5)
     # can only assign demand to open facilities
-@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD,sc=1:SC], y[i,j,s,p,sd] <= x[j,s,p,sc]);
+@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD], y[i,j,s,p,sd] <= x[j,s,p]);
 
     # equation (6)
     # no unassigned demand for any year
@@ -189,12 +189,9 @@ sum(y[i,j,s,p,sd] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar +
 
     # equation (7)
     # Capacity constraint (Cannot allocate more demand to a facility j than there is capacity for)
-@constraint(model, [j=1:J,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd]*(Demand[i,p]*scenario_demand[i,p,sd]) for i in 1:I, s in 1:S) <= sum(x[j,s,p,sc]*(Capacity[s]*scenario_capacity[p,s,sc]) for s in 1:S));
+@constraint(model, [j=1:J,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd]*(Demand[i,p]*scenario_demand[i,p,sd]) for i in 1:I,s in 1:S) <= sum(x[j,s,p]*(Capacity[s]*scenario_capacity[p,s,sc]) for s in 1:S));
 
 #non-anticipatory constraint
-for p=1:P
-    @constraint(model, [sc=1:SC-1,j=1:J,s=1:S], x[j,s,p,sc] == x[j,s,p,sc+1])
-end
 #@constraint(model, [sd=1:SD-1,i=1:I,j=1:J,s=1:S], y[i,j,s,1,sd] == y[i,j,s,1,sd+1])
     #-------
     # SOLVE
@@ -211,13 +208,12 @@ if termination_status(model) == MOI.OPTIMAL
     println("   ")
     println("----------------------")
     println("   ")
-    println("Capacity scenario = ",sc)
     for p = 1:P
         println("Production year = $(Year[p]) ")
         println("   ")
         for j = 1:J
             for s = 1:S
-                if value(x[j,s,p,1]) == 1
+                if value(x[j,s,p]) == 1
                     println("Facility = $(Facility[j]) | Size = $(Size[s])")
                     println(" Serving demand zone: ")
                     for i = 1:I
