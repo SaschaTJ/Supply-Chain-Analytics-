@@ -151,7 +151,7 @@ model = Model(Cbc.Optimizer);
     # x[j,s,p]
 
     # Fraction of demand from zone i to allocate to facility in location j in year p
-@variable(model,y[i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD] >=0);
+@variable(model,y[i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD,sc=1:SC] >=0);
 
     # y[i,j,s,p]
 
@@ -163,7 +163,7 @@ model = Model(Cbc.Optimizer);
     #
 @objective(model, Min,
 sum(x[j,s,p] * (Fixed[j,s] + InvFixed) for j in 1:J,s in 1:S,p in 1:P) +
-sum(y[i,j,s,p,sd] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar + ShippingCost[i,j]) * sd_prob[sd] for i in 1:I,j in 1:J,s in 1:S,p in 1:P,sd in 1:SD));
+sum(y[i,j,s,p,sd,sc] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar + ShippingCost[i,j]) * sd_prob[sd]*sc_prob[sc] for i in 1:I,j in 1:J,s in 1:S,p in 1:P,sd in 1:SD,sc in 1:SC));
 
     #-------
 
@@ -181,18 +181,17 @@ sum(y[i,j,s,p,sd] * (Demand[i,p]*scenario_demand[i,p,sd]) * (Var[j,s] + InvVar +
 
     # equation (5)
     # can only assign demand to open facilities
-@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD], y[i,j,s,p,sd] <= x[j,s,p]);
+@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD,sc=1:SC], y[i,j,s,p,sd,sc] <= x[j,s,p]);
 
     # equation (6)
     # no unassigned demand for any year
-@constraint(model, [i=1:I,p=1:P,sd=1:SD], sum(y[i,j,s,p,sd] for j in 1:J, s in 1:S) == 1);
+@constraint(model, [i=1:I,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd,sc] for j in 1:J, s in 1:S) == 1);
+#@constraint(model, [i=1:I,p=1:P,sd=1:SD], sum(y[i,j,s,p,sd] for j in 1:J, s in 1:S) == 1);
 
     # equation (7)
     # Capacity constraint (Cannot allocate more demand to a facility j than there is capacity for)
-@constraint(model, [j=1:J,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd]*(Demand[i,p]*scenario_demand[i,p,sd]) for i in 1:I,s in 1:S) <= sum(x[j,s,p]*(Capacity[s]*scenario_capacity[p,s,sc]) for s in 1:S));
+@constraint(model, [j=1:J,p=1:P,sd=1:SD,sc=1:SC], sum(y[i,j,s,p,sd,sc]*(Demand[i,p]*scenario_demand[i,p,sd]) for i in 1:I,s in 1:S) <= sum(x[j,s,p]*(Capacity[s]*scenario_capacity[p,s,sc]) for s in 1:S));
 
-#non-anticipatory constraint
-#@constraint(model, [sd=1:SD-1,i=1:I,j=1:J,s=1:S], y[i,j,s,1,sd] == y[i,j,s,1,sd+1])
     #-------
     # SOLVE
     #-------

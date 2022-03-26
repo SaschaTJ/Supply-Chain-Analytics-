@@ -2,6 +2,7 @@ using JuMP
 # using Cbc
 using Cbc
 
+M = 9999999999999999999
 Zone = ["Northwest", "Southwest", "Upper Midwest", "Lower Midwest", "Northeast", "Southeast"]
 I = length(Zone) # number of customers : 6
 
@@ -99,12 +100,12 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (2)
     # Cannot open a small and large facility in the same location
-@constraint(model, [j = 1:J, p = 1:P], sum(x[j,s,p] for s in 1:S) <= 1);
+@constraint(model, [j = 1:J, p = 1:P], x[j,1,p] >= x[j,2,p]*M);
 
 
     # equation (5)
     # can only assign demand to open facilities
-@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P], y[i,j,s,p] <= x[j,s,p]);
+@constraint(model, [i=1:I,j=1:J,s=1:S,p=1:P], y[i,j,s,p] <= x[j,s,p]*M);
 
     # equation (6)
     # no unassigned demand for any year
@@ -112,7 +113,7 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (7)
     # Capacity constraint (Cannot allocate more demand to a facility j than there is capacity for)
-@constraint(model, [j=1:J,p=1:P], sum(y[i,j,s,p]*Demand[i,p] for i in 1:I, s in 1:S) <= sum(x[j,s,p]*Capacity[s] for s in 1:S));
+@constraint(model, [j=1:J,p=1:P,s=1:S], sum(y[i,j,s,p]*Demand[i,p] for i in 1:I) <= x[j,s,p]*Capacity[s]);
 
     #-------
     # SOLVE
@@ -132,7 +133,7 @@ if termination_status(model) == MOI.OPTIMAL
         println("   ")
         for j = 1:J
             for s = 1:S
-                if value(x[j,s,p]) > 0
+                if value(x[j,s,p]) > 0.01
                     println("$(round(value(x[j,s,p])*100,digits=2)) percentage of Facility = $(Facility[j]) | Size = $(Size[s])")
                     println(" Serving demand zone: ")
                     for i = 1:I
