@@ -146,12 +146,12 @@ ShippingCost = [
 
 model = Model(Cbc.Optimizer);
 
-    # binary: decision to open a facility of size s in location j in year p
+    # decision to open a facility of size s in location j in year p
 @variable(model,1 >= x[j=1:J,s=1:S,p=1:P] >= 0);
     # x[j,s,p]
 
     # Fraction of demand from zone i to allocate to facility in location j in year p with stochastic elements sd and sc
-@variable(model,y[i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD,sc=1:SC] >=0);
+@variable(model, y[i=1:I,j=1:J,s=1:S,p=1:P,sd=1:SD,sc=1:SC] >= 0);
     # y[i,j,s,p,sd,sc]
 
     #-------
