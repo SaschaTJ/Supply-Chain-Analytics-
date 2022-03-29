@@ -1,6 +1,6 @@
 using JuMP
-using Gurobi
-#using Cbc
+#using Gurobi
+using Cbc
 
 M = 9999999999999999999
 Zone = ["Northwest", "Southwest", "Upper Midwest", "Lower Midwest", "Northeast", "Southeast"]
@@ -143,10 +143,10 @@ ShippingCost = [
     5.5 4.5 3.5 2.5 4.0
 ];
 
-model = Model(Gurobi.Optimizer);
+model = Model(Cbc.Optimizer);
 
     # binary: decision to open a facility of size s in location j in year p
-@variable(model, x[j=1:J,s=1:S,p=1:P] >= 0, Bin);
+@variable(model,1 >= x[j=1:J,s=1:S,p=1:P] >= 0);
     # x[j,s,p]
 
     # Fraction of demand from zone i to allocate to facility in location j in year p with stochastic elements sd
@@ -199,8 +199,8 @@ if termination_status(model) == MOI.OPTIMAL
         println("   ")
         for j = 1:J
             for s = 1:S
-                if value(x[j,s,p]) == 1
-                    println("Facility = $(Facility[j]) | Size = $(Size[s])")
+                if value(x[j,s,p]) > 0.01
+                    println("$(round(value(x[j,s,p])*100,digits=2)) percentage of Facility = $(Facility[j]) | Size = $(Size[s])")
                     println(" Serving demand zone: ")
                     for i = 1:I
                         if value(y[i,j,s,p,1]) != 0
