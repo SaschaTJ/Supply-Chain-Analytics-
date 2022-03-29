@@ -100,8 +100,7 @@ sum(y[i,j,s,p] * Demand[i,p] * (Var[j,s] + InvVar + ShippingCost[i,j]) for i in 
 
     # equation (2)
     # Cannot open a small and large facility in the same location
-@constraint(model, [j = 1:J, p = 1:P], x[j,1,p] >= x[j,2,p]*M);
-
+@constraint(model, [j=1:J,p=1:P], sum(x[j,s,p] for s in 1:S) <= 1);
 
     # equation (5)
     # can only assign demand to open facilities
