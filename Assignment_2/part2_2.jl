@@ -95,7 +95,7 @@ model = Model(Gurobi.Optimizer);
 # Constraint 1: Flow balance constraints at depot in each period t:
 
 
-@constraint(model, [t=1:T-1], p[1,t] == p[1,t+1] + sum(q[i,k,t+1] for i in 2:I, k in 1:K));
+#@constraint(model, [t=1:T-1], p[1,t] == p[1,t+1] + sum(q[i,k,t+1] for i in 2:I, k in 1:K));
 
 # Constraint 2: Flow balance constraints at each customer i in each period t:
 
@@ -141,11 +141,10 @@ demand = [
 ];
 
 
-actual_inventory = zeros(I-1,T)
 fill_rates_count = zeros(I-1,T)
 Random.seed!(0);
 for r = 1:10000
-    #println("Iteration: ",r)
+    inv = Inv_begin[2:end]
     actual_demand = demand + (randn(I-1,T).* demand_std)
     for t=1:T
         for i=1:I-1
@@ -154,15 +153,15 @@ for r = 1:10000
                 delivered += value(q[i+1,k,t])
             end
             actual_demand[i,t] = max(actual_demand[i,t],0)
-            actual_inventory[i,t] = (t>1 ? actual_inventory[i,t-1] : Inv_begin[i+1]) + delivered - actual_demand[i,t]
-            if actual_inventory[i,t] < 0
-                fill_rate = (-actual_inventory[i,t])/actual_demand[i,t]
-                actual_inventory[i,t] = 0
+            inv[i] = inv[i] + delivered - actual_demand[i,t]
+            if inv[i] < 0
+                fill_rate = (actual_demand[i,t]+inv[i])/actual_demand[i,t]
+                inv[i] = 0
             else
                 fill_rate = 1
             end
-            if fill_rate>0.95
-                fill_rates_count[i,t] += 1
+            if fill_rate>=0.95
+                fill_rates_count[i,t] += fill_rate
             end
             #println("DC: ",i)
             #println("Demand: ",actual_demand[i,t])
@@ -171,4 +170,4 @@ for r = 1:10000
         end
     end 
 end
-println(fill_rates_count/10000)
+fill_rates_count/10000
