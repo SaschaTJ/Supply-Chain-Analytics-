@@ -38,8 +38,6 @@ demand = [0 0 0 0 0 0 0 0
 
 
 
-
-
 demand_std = [
     11.87434209	11.87434209	11.87434209	11.87434209	11.87434209	14.68843082	14.68843082	11.87434209
     10.90871211	13.89244399	13.89244399	13.89244399	13.89244399	14.14213562	11.22497216	10.90871211
@@ -132,36 +130,28 @@ if termination_status(model) == MOI.OPTIMAL
 
 end
 
-demand = [
-    75.9 75.9 75.9 75.9 75.9 85.7 85.7 75.9
-    62.9 94.8 94.8 94.8 94.8 68.65 36.75 62.9
-    67.2 67.2 67.2 67.2 67.2 67.15 67.15 67.2
-    102.3 156.0 156.0 156.0 156.0 119.05 65.35 102.3
-    107.4 130.1 130.1 130.1 130.1 65.15 42.45 107.4
-];
+
 
 
 fill_rates_count = zeros(I-1,T)
 Random.seed!(0);
 for r = 1:10000
     inv = Inv_begin[2:end]
-    actual_demand = demand + (randn(I-1,T).* demand_std)
+    actual_demand = demand[2:end,:] + (randn(I-1,T).* demand_std)
     for t=1:T
         for i=1:I-1
+            if actual_demand[i,t] == 0
+                println(r, " ",t, " ",i)
+            end
             delivered = 0
             for k=1:K
                 delivered += value(q[i+1,k,t])
             end
-            actual_demand[i,t] = max(actual_demand[i,t],0)
             inv[i] = inv[i] + delivered - actual_demand[i,t]
-            if inv[i] < 0
-                fill_rate = (actual_demand[i,t]+inv[i])/actual_demand[i,t]
-                inv[i] = 0
-            else
-                fill_rate = 1
-            end
+            demand_met_from_stock =  max(actual_demand[i,t] + min(inv[i],0),0)
+            fill_rate = demand_met_from_stock / actual_demand[i,t]
             if fill_rate>=0.95
-                fill_rates_count[i,t] += fill_rate
+                fill_rates_count[i,t] += 1
             end
             #println("DC: ",i)
             #println("Demand: ",actual_demand[i,t])
