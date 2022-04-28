@@ -41,12 +41,18 @@ demand = [0 0 0 0 0 0 0 0
 
 
 demand_std = [0 0 0 0 0 0 0 0
-    118.7434209	118.7434209	118.7434209	118.7434209	118.7434209	146.8843082	146.8843082	118.7434209
-    109.0871211	138.9244399	138.9244399	138.9244399	138.9244399	141.4213562	112.2497216	109.0871211
-    112.6942767	112.6942767	112.6942767	112.6942767	112.6942767	128.6468033	128.6468033	112.6942767
-    131.9090596	160.3121954	160.3121954	160.3121954	160.3121954	150.4991694	119.7914855	131.9090596
-    130.3840481	140	140	140	140	110.792599	98.36157786	130.3840481
+    11.87434209	11.87434209	11.87434209	11.87434209	11.87434209	14.68843082	14.68843082	11.87434209
+    10.90871211	13.89244399	13.89244399	13.89244399	13.89244399	14.14213562	11.22497216	10.90871211
+    11.26942767	11.26942767	11.26942767	11.26942767	11.26942767	12.86468033	12.86468033	11.26942767
+    13.19090596	16.03121954	16.03121954	16.03121954	16.03121954	15.04991694	11.97914855	13.19090596
+    13.03840481	14	        14	        14	        14	        11.0792599	9.836157786	13.03840481
 ];
+
+Random.seed!(0);
+actual_demand = zeros(10000,I-1,T)
+for r = 1:10000
+    actual_demand[r,:,:] = demand[2:end,:] + (randn(I-1,T).* demand_std[2:end,:])
+end
 
 #demand_std = [0 0 0 0 0 0 0 0
 #    43 43 43 43 43 46.5 46.5 43
@@ -64,9 +70,10 @@ model = Model(Gurobi.Optimizer);
 @variable(model, p[i=1:I,t=1:T] >=0); # inventory at node i in time period t
 #@variable(model, r[t=1:T] >=0); #supply available at depot (node 0) at time t
 @variable(model, q[i=2:I,k=1:K,t=1:T] >=0); # Quantity delivered to customer i by vehicle k at start of period t
-@variable(model, za[i=2:I,t=1:T] >=0); #safety stock
+@variable(model, za >=0); #safety stock
+@variable(model, f[r=1:10000,i=2:I,t=1:T] >= 0);
 
-@objective(model, Min,sum(h*p[i,t] for i in 2:I, t in 1:T)+ sum(shippingCost[i,j]*x[i,j,k,t] for i in 1:I,j in 1:I,k in 1:K,t in 1:T));
+@objective(model, Min,sum(h*p[i,t] for i in 2:I, t in 1:T) + sum(shippingCost[i,j]*x[i,j,k,t] for i in 1:I,j in 1:I,k in 1:K,t in 1:T));
 
 #_______________ pure VRP
 
@@ -100,7 +107,7 @@ model = Model(Gurobi.Optimizer);
 
 # Constraint 2: Flow balance constraints at each customer i in each period t:
 
-@constraint(model, [i=2:I,t=1:T], (t == 1 ? Inv_begin[i] : p[i,t-1]) + sum(q[i,k,t] for k in 1:K) == p[i,t] + demand[i,t])
+@constraint(model, [i=2:I,t=1:T], (t == 1 ? Inv_begin[i] : p[i,t-1]) + sum(q[i,k,t] for k in 1:K) == p[i,t] + demand[i,t] + za*demand_std[i,t])
 
 # Constraint 3: Inventory capacity constraints at each customer i in each period t:
 
@@ -117,29 +124,9 @@ model = Model(Gurobi.Optimizer);
 
 @constraint(model, [k=1:K,t=1:T], sum(q[i,k,t] for i in 2:I) <= Captruck*y[1,k,t]);
 
-actual_inventory = zeros(I,T)
-fill_rates_count = zeros(I,T)
+#@constraint(model, [r=1:10000,i=1:I-1,t=1:T], (p[i+1,t]+sum(q[i+1,k,t] for k in 1:K))/actual_demand[r,i,t] - f[r,i+1,t] <= 1);
 
-Random.seed!(0);
-for r = 1:10000
-    actual_demand = demand + randn(I,T).*demand_std
-    for t=1:T
-        for i=2:I
-            actual_demand[i,t] = max(actual_demand[i,t],0)
-            actual_inventory[i,t] = (t>1 ? actual_inventory[i,t-1] : Inv_begin[i]) + delivered - actual_demand[i,t]
-            if actual_inventory[i,t] < 0
-                fill_rate = (-actual_inventory[i,t])/actual_demand[i,t]
-                actual_inventory[i,t] = 0
-            else
-                fill_rate = 1
-            end
-            if fill_rate>=0.95
-                fill_rates_count[i,t] += 1
-            end
-        end
-    end 
-end
-@constraint(model, [i=2:I,t=1:T], fill_rates_count[i,t]/10000 >= 0.95);
+@constraint(model, [i=1:I-1,t=1:T], sum(()/actual_demand[r,i,t] for r in 1:10000)/10000 >= 0.99);
 #-------
 # SOLVE
 #-------
@@ -153,7 +140,27 @@ if termination_status(model) == MOI.OPTIMAL
     println("   ")
     println("----------------------")
     println("   ")
-
 end
 
-
+for r = 1:10000
+    inv = Inv_begin[2:end]
+    for t=1:T
+        for i=1:I-1
+            delivered = 0
+            for k=1:K
+                delivered += value(q[i+1,k,t])
+            end
+            inv[i] = inv[i] + delivered - actual_demand[r,i,t]
+            demand_met_from_stock =  max(actual_demand[r,i,t] + min(inv[i],0),0)
+            fill_rate = demand_met_from_stock / actual_demand[r,i,t]
+            if fill_rate>=0.95
+                fill_rates_count[i,t] += 1
+            end
+            #println("DC: ",i)
+            #println("Demand: ",actual_demand[i,t])
+            #println(" | Inventory: ",actual_inventory[i,t])
+            #println(fill_rate)
+        end
+    end 
+end
+fill_rates_count/10000
